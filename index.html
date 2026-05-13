@@ -547,6 +547,99 @@
   }
   .boppity span:hover { color:var(--purple-light); }
 
+  /* ── PIN OVERLAY ── */
+  #pinOverlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #FDF6FF; display: flex; align-items: center; justify-content: center;
+  }
+  #pinOverlay.hidden { display: none; }
+  .pin-box {
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+    padding: 40px 32px; width: 300px;
+  }
+  .pin-logo {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--pink-mid), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Pinyon Script', cursive; font-size: 36px; color: white;
+    box-shadow: 0 6px 24px rgba(155,114,207,0.35);
+  }
+  .pin-heading {
+    font-family: 'Lora', serif; font-size: 18px; color: var(--text-dark); text-align: center;
+  }
+  .pin-sub {
+    font-size: 12px; color: var(--text-soft); letter-spacing: 1px; text-align: center; margin-top: -12px;
+  }
+  .pin-dots { display: flex; gap: 14px; }
+  .pin-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--purple-light); background: transparent; transition: all 0.15s;
+  }
+  .pin-dot.filled { background: var(--purple); border-color: var(--purple); }
+  .pin-dot.error  { border-color: #e05; background: #e05; }
+  .pin-error {
+    font-size: 12px; color: #c0396a; min-height: 16px; text-align: center; letter-spacing: 0.5px;
+  }
+  .pin-pad {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;
+  }
+  .pin-key {
+    aspect-ratio: 1; border-radius: 14px; border: 1.5px solid var(--purple-pale);
+    background: var(--purple-cream); font-family: 'Lora', serif; font-size: 20px;
+    color: var(--text-dark); cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pin-key:hover  { background: var(--purple-pale); border-color: var(--purple-light); }
+  .pin-key:active { background: var(--purple-light); color: white; transform: scale(0.95); }
+  .pin-key.del    { font-size: 18px; }
+  .pin-key.empty  { border: none; background: none; cursor: default; }
+  @keyframes pinShake {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 60%{transform:translateX(8px)}
+  }
+  .pin-dots.shake { animation: pinShake 0.35s ease; }
+
+  /* ── CHANGE PIN MODAL ── */
+  #changePinModal {
+    position: fixed; inset: 0; z-index: 9998; background: rgba(30,16,40,0.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #changePinModal.hidden { display: none; }
+  .change-pin-box {
+    background: white; border-radius: 22px; padding: 32px 28px;
+    width: 300px; display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 12px 40px rgba(100,50,140,0.2);
+  }
+  .change-pin-title {
+    font-family: 'Lora', serif; font-size: 17px; color: var(--text-dark); text-align: center;
+  }
+  .change-pin-input {
+    border: 1.5px solid var(--purple-pale); border-radius: 10px; padding: 10px 14px;
+    font-family: 'DM Sans', sans-serif; font-size: 16px; text-align: center;
+    letter-spacing: 6px; outline: none; transition: border-color 0.2s;
+    background: var(--purple-cream); color: var(--text-dark); width: 100%;
+  }
+  .change-pin-input:focus { border-color: var(--purple); }
+  .change-pin-input::placeholder { letter-spacing: 1px; font-size: 13px; }
+  .change-pin-btn {
+    padding: 10px; border-radius: 12px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; transition: all 0.2s;
+  }
+  .change-pin-btn.primary {
+    background: linear-gradient(135deg, var(--purple), var(--purple-deep)); color: white;
+    box-shadow: 0 3px 12px rgba(155,114,207,0.35);
+  }
+  .change-pin-btn.primary:hover { opacity: 0.88; }
+  .change-pin-btn.secondary {
+    background: var(--purple-pale); color: var(--purple-deep);
+  }
+  .change-pin-btn.secondary:hover { background: var(--purple-light); color: white; }
+  .change-pin-error { font-size: 12px; color: #c0396a; text-align: center; min-height: 16px; }
+  .pin-lock-btn {
+    background: none; border: none; cursor: pointer; color: var(--purple-pale);
+    font-size: 14px; transition: color 0.2s; padding: 4px 8px;
+  }
+  .pin-lock-btn:hover { color: var(--purple-light); }
+
   /* Responsive */
   @media (max-width:1100px) {
     .grid-top  { grid-template-columns:1fr 1fr; }
@@ -562,6 +655,50 @@
 </style>
 </head>
 <body>
+
+<!-- ── PIN OVERLAY ── -->
+<div id="pinOverlay">
+  <div class="pin-box">
+    <div class="pin-logo">B</div>
+    <div class="pin-heading">Bethany's Dashboard</div>
+    <div class="pin-sub">Enter your PIN</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <div class="pin-key empty"></div>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key del" onclick="pinBackspace()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHANGE PIN MODAL ── -->
+<div id="changePinModal" class="hidden">
+  <div class="change-pin-box">
+    <div class="change-pin-title">Change PIN</div>
+    <input class="change-pin-input" id="cpCurrent" type="password" inputmode="numeric" maxlength="4" placeholder="Current PIN">
+    <input class="change-pin-input" id="cpNew"     type="password" inputmode="numeric" maxlength="4" placeholder="New PIN (4 digits)">
+    <input class="change-pin-input" id="cpConfirm" type="password" inputmode="numeric" maxlength="4" placeholder="Confirm New PIN">
+    <div class="change-pin-error" id="cpError"></div>
+    <button class="change-pin-btn primary"    onclick="submitChangePin()">Save PIN</button>
+    <button class="change-pin-btn secondary"  onclick="closeChangePinModal()">Cancel</button>
+  </div>
+</div>
+
 <div class="container">
 
   <!-- ── HEADER ── -->
@@ -826,7 +963,10 @@ Email Mrs. Peterson re: project</textarea>
   </div>
 
   <!-- ── EASTER EGG ── -->
-  <div class="boppity"><span>✦ Bethany Bopity's Dashboard ✦</span></div>
+  <div class="boppity">
+    <span>✦ Bethany Bopity's Dashboard ✦</span>
+    <button class="pin-lock-btn" onclick="openChangePinModal()" title="Change PIN">🔒</button>
+  </div>
 
 </div><!-- /container -->
 
@@ -1200,6 +1340,87 @@ if (spotifyToken && Date.now() < spotifyExpiry) {
 } else {
   showSpotifyState('connect');
 }
+
+// ── PIN ──
+const PIN_KEY = 'bethanyPin';
+let pinEntry = '';
+
+function getPin() { return localStorage.getItem(PIN_KEY) || '1234'; }
+
+function pinKey(digit) {
+  if (pinEntry.length >= 4) return;
+  pinEntry += digit;
+  updatePinDots();
+  if (pinEntry.length === 4) setTimeout(checkPin, 120);
+}
+
+function pinBackspace() {
+  pinEntry = pinEntry.slice(0, -1);
+  updatePinDots();
+  document.getElementById('pinError').textContent = '';
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById(`pd${i}`);
+    dot.classList.toggle('filled', i < pinEntry.length);
+    dot.classList.remove('error');
+  }
+}
+
+function checkPin() {
+  if (pinEntry === getPin()) {
+    document.getElementById('pinOverlay').classList.add('hidden');
+  } else {
+    const dots = document.getElementById('pinDots');
+    for (let i = 0; i < 4; i++) document.getElementById(`pd${i}`).classList.add('error');
+    dots.classList.add('shake');
+    document.getElementById('pinError').textContent = 'Incorrect PIN — try again';
+    setTimeout(() => {
+      dots.classList.remove('shake');
+      pinEntry = '';
+      updatePinDots();
+      document.getElementById('pinError').textContent = '';
+    }, 600);
+  }
+}
+
+function openChangePinModal() {
+  ['cpCurrent','cpNew','cpConfirm'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cpError').textContent = '';
+  document.getElementById('changePinModal').classList.remove('hidden');
+}
+
+function closeChangePinModal() {
+  document.getElementById('changePinModal').classList.add('hidden');
+}
+
+function submitChangePin() {
+  const current = document.getElementById('cpCurrent').value.trim();
+  const next    = document.getElementById('cpNew').value.trim();
+  const confirm = document.getElementById('cpConfirm').value.trim();
+  const errEl   = document.getElementById('cpError');
+  if (current !== getPin())          { errEl.textContent = 'Current PIN is incorrect'; return; }
+  if (!/^\d{4}$/.test(next))        { errEl.textContent = 'New PIN must be 4 digits'; return; }
+  if (next !== confirm)              { errEl.textContent = 'PINs don\'t match'; return; }
+  localStorage.setItem(PIN_KEY, next);
+  closeChangePinModal();
+}
+
+// Show PIN screen on load
+(function initPin() {
+  // Already unlocked this session?
+  if (sessionStorage.getItem('bethanyUnlocked') === '1') {
+    document.getElementById('pinOverlay').classList.add('hidden');
+  }
+  // Hide overlay on successful unlock and mark session
+  const observer = new MutationObserver(() => {
+    if (document.getElementById('pinOverlay').classList.contains('hidden')) {
+      sessionStorage.setItem('bethanyUnlocked', '1');
+    }
+  });
+  observer.observe(document.getElementById('pinOverlay'), { attributes: true });
+})();
 
 // ── FAVICON ──
 document.fonts.load('26px "Pinyon Script"').then(() => {

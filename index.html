@@ -1216,42 +1216,117 @@ function updateSessionDots() {
 
 updatePomoDisplay();
 
-// ── SPOTIFY ──
-// To activate:
-//   1. Go to developer.spotify.com → Log in → "Create app"
-//   2. Set Redirect URI to your Vercel URL (e.g. https://bethany-dashboard.vercel.app)
-//   3. Copy the Client ID and paste it below, then redeploy
-const SPOTIFY_CLIENT_ID = 'YOUR_CLIENT_ID_HERE'; // ← paste Bethany's Client ID here
+// ── SPOTIFY (PKCE flow) ──
+const SPOTIFY_CLIENT_ID = '9e15d20c4c664d52a39f35617db568fb';
 const SPOTIFY_SCOPES    = 'user-read-playback-state user-modify-playback-state user-read-currently-playing';
+const REDIRECT_URI      = (window.location.origin + window.location.pathname).replace(/\/$/, '');
 
 let spotifyToken     = localStorage.getItem('bethanySpotifyToken') || null;
 let spotifyExpiry    = parseInt(localStorage.getItem('bethanySpotifyExpiry') || '0');
 let spotifyPollTimer = null;
 
-(function checkOAuthReturn() {
-  const hash = window.location.hash.substring(1);
-  if (!hash) return;
-  const params = Object.fromEntries(hash.split('&').map(p => p.split('=')));
-  if (params.access_token) {
-    spotifyToken  = params.access_token;
-    spotifyExpiry = Date.now() + parseInt(params.expires_in || 3600) * 1000;
-    try {
-      localStorage.setItem('bethanySpotifyToken',  spotifyToken);
-      localStorage.setItem('bethanySpotifyExpiry', String(spotifyExpiry));
-    } catch(e) {}
+// PKCE helpers
+function b64url(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function genVerifier() {
+  const arr = new Uint8Array(48);
+  crypto.getRandomValues(arr);
+  return b64url(arr);
+}
+async function genChallenge(verifier) {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return b64url(hash);
+}
+
+// Handle return from Spotify auth (?code=... in query string)
+(async function checkOAuthReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const code   = params.get('code');
+  const error  = params.get('error');
+  if (error) {
+    history.replaceState(null, '', window.location.pathname);
+    alert('Spotify auth error: ' + error);
+    return;
+  }
+  if (!code) return;
+  const verifier = localStorage.getItem('bethanySpotifyVerifier');
+  if (!verifier) return;
+
+  try {
+    const body = new URLSearchParams({
+      client_id: SPOTIFY_CLIENT_ID,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: REDIRECT_URI,
+      code_verifier: verifier
+    });
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    if (!res.ok) {
+      console.error('Token exchange failed:', await res.text());
+      history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    const data = await res.json();
+    spotifyToken  = data.access_token;
+    spotifyExpiry = Date.now() + data.expires_in * 1000;
+    localStorage.setItem('bethanySpotifyToken',  spotifyToken);
+    localStorage.setItem('bethanySpotifyExpiry', String(spotifyExpiry));
+    if (data.refresh_token) localStorage.setItem('bethanySpotifyRefresh', data.refresh_token);
+    localStorage.removeItem('bethanySpotifyVerifier');
     history.replaceState(null, '', window.location.pathname);
     startSpotifyPolling();
+  } catch(e) {
+    console.error(e);
+    history.replaceState(null, '', window.location.pathname);
   }
 })();
 
-function spotifyConnect() {
-  if (SPOTIFY_CLIENT_ID === 'YOUR_CLIENT_ID_HERE') {
-    alert('To activate Spotify:\n\n1. Go to developer.spotify.com\n2. Log in and create a free app\n3. Copy your Client ID\n4. Open index.html and paste it where it says YOUR_CLIENT_ID_HERE\n5. Set the Redirect URI to this page\'s URL in your Spotify app settings\n6. Redeploy to Vercel');
-    return;
-  }
-  const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
-  const url = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=token&redirect_uri=${redirectUri}&scope=${encodeURIComponent(SPOTIFY_SCOPES)}&show_dialog=true`;
-  window.location.href = url;
+async function spotifyConnect() {
+  const verifier  = genVerifier();
+  const challenge = await genChallenge(verifier);
+  localStorage.setItem('bethanySpotifyVerifier', verifier);
+
+  const params = new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: REDIRECT_URI,
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
+    scope: SPOTIFY_SCOPES,
+    show_dialog: 'true'
+  });
+  window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+}
+
+async function refreshSpotifyToken() {
+  const refresh = localStorage.getItem('bethanySpotifyRefresh');
+  if (!refresh) return false;
+  try {
+    const body = new URLSearchParams({
+      client_id: SPOTIFY_CLIENT_ID,
+      grant_type: 'refresh_token',
+      refresh_token: refresh
+    });
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    spotifyToken  = data.access_token;
+    spotifyExpiry = Date.now() + data.expires_in * 1000;
+    localStorage.setItem('bethanySpotifyToken',  spotifyToken);
+    localStorage.setItem('bethanySpotifyExpiry', String(spotifyExpiry));
+    if (data.refresh_token) localStorage.setItem('bethanySpotifyRefresh', data.refresh_token);
+    return true;
+  } catch(e) { return false; }
 }
 
 function showSpotifyState(state) {
@@ -1261,15 +1336,21 @@ function showSpotifyState(state) {
 }
 
 async function fetchNowPlaying() {
-  if (!spotifyToken || Date.now() > spotifyExpiry) {
-    showSpotifyState('connect'); return;
+  if (!spotifyToken) { showSpotifyState('connect'); return; }
+  if (Date.now() > spotifyExpiry - 30000) {
+    const ok = await refreshSpotifyToken();
+    if (!ok) { showSpotifyState('connect'); return; }
   }
   try {
     const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
       headers: { Authorization: `Bearer ${spotifyToken}` }
     });
     if (res.status === 204 || res.status === 404) { showSpotifyState('idle'); return; }
-    if (res.status === 401) { spotifyToken = null; showSpotifyState('connect'); return; }
+    if (res.status === 401) {
+      const ok = await refreshSpotifyToken();
+      if (ok) return fetchNowPlaying();
+      spotifyToken = null; showSpotifyState('connect'); return;
+    }
     if (!res.ok) return;
     const data = await res.json();
     if (!data || !data.item) { showSpotifyState('idle'); return; }
@@ -1337,7 +1418,7 @@ function startSpotifyPolling() {
 
 if (spotifyToken && Date.now() < spotifyExpiry) {
   startSpotifyPolling();
-} else {
+} else if (!new URLSearchParams(window.location.search).get('code')) {
   showSpotifyState('connect');
 }
 

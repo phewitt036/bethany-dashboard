@@ -1428,6 +1428,16 @@ let pinEntry = '';
 
 function getPin() { return localStorage.getItem(PIN_KEY) || '1234'; }
 
+// Keyboard input for laptop users
+document.addEventListener('keydown', e => {
+  const overlay = document.getElementById('pinOverlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  const cpModal = document.getElementById('changePinModal');
+  if (cpModal && !cpModal.classList.contains('hidden')) return;
+  if (/^[0-9]$/.test(e.key)) { e.preventDefault(); pinKey(e.key); }
+  else if (e.key === 'Backspace') { e.preventDefault(); pinBackspace(); }
+});
+
 function pinKey(digit) {
   if (pinEntry.length >= 4) return;
   pinEntry += digit;

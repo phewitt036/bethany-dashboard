@@ -224,6 +224,43 @@
     cursor:pointer; transition:all 0.2s; white-space:nowrap;
   }
   .check-add-btn:hover { opacity:0.88; transform:translateY(-1px); }
+
+  /* ── CHAT ── */
+  .chat-card { margin-top: 22px; }
+  .chat-messages {
+    display: flex; flex-direction: column; gap: 10px;
+    min-height: 120px; max-height: 320px; overflow-y: auto;
+    margin-bottom: 14px; padding-right: 4px;
+  }
+  .chat-messages::-webkit-scrollbar { width: 3px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--purple-pale); border-radius: 2px; }
+  .chat-bubble {
+    max-width: 78%; padding: 10px 14px; border-radius: 16px;
+    font-size: 14px; line-height: 1.45;
+    white-space: pre-wrap; overflow-wrap: break-word;
+    color: var(--text-dark);
+  }
+  .chat-bubble.user { align-self: flex-end; background: var(--purple-pale); border-bottom-right-radius: 4px; }
+  .chat-bubble.bot { align-self: flex-start; background: var(--pink-pale); border-bottom-left-radius: 4px; }
+  .chat-bubble.error { align-self: flex-start; background: var(--purple-cream); font-style: italic; color: var(--text-soft); }
+  .chat-empty { text-align: center; color: var(--text-soft); font-size: 13px; font-style: italic; padding: 24px 0; }
+  .chat-typing { align-self: flex-start; background: var(--pink-pale); border-radius: 16px; border-bottom-left-radius: 4px; padding: 12px 16px; display: flex; gap: 5px; }
+  .chat-typing span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--pink-deep); opacity: 0.4;
+    animation: chatBlink 1.2s infinite;
+  }
+  .chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes chatBlink { 0%, 60%, 100% { opacity: 0.35; } 30% { opacity: 1; } }
+  .chat-input-row { display: flex; gap: 10px; }
+  .chat-clear-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 11px; color: var(--text-soft);
+    font-family: 'DM Sans', sans-serif;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .chat-clear-btn:hover { color: var(--purple-deep); }
   .checklist-items {
     display:flex; flex-direction:column; gap:6px;
     max-height:280px; overflow-y:auto;
@@ -962,6 +999,19 @@ Email Mrs. Peterson re: project</textarea>
 
   </div>
 
+  <!-- ── BETHANY'S BUDDY CHAT ── -->
+  <div class="card purple-top chat-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="card-title"><span class="pip purple"></span> Bethany's Buddy</div>
+      <button class="chat-clear-btn" onclick="clearChat()">Clear</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input class="check-input" id="chatInput" placeholder="Ask me anything…" maxlength="800" autocomplete="off">
+      <button class="check-add-btn" id="chatSend" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
   <!-- ── EASTER EGG ── -->
   <div class="boppity">
     <span>✦ Bethany Bopity's Dashboard ✦</span>
@@ -1577,6 +1627,91 @@ function submitChangePin() {
     document.getElementById('pinOverlay').classList.add('hidden');
   }
 })();
+
+// ── BETHANY'S BUDDY CHAT ──
+let chatHistory = [];
+try { chatHistory = JSON.parse(localStorage.getItem('bethanyChat')) || []; } catch { chatHistory = []; }
+if (!Array.isArray(chatHistory)) chatHistory = [];
+let chatPending = false;
+let chatError = '';
+const chatMessagesEl = document.getElementById('chatMessages');
+const chatInputEl = document.getElementById('chatInput');
+const chatSendEl = document.getElementById('chatSend');
+
+function renderChat(showTyping) {
+  chatMessagesEl.textContent = '';
+  if (chatHistory.length === 0 && !showTyping && !chatError) {
+    const hint = document.createElement('div');
+    hint.className = 'chat-empty';
+    hint.textContent = "Say hi — I'm all ears! 💬";
+    chatMessagesEl.appendChild(hint);
+    return;
+  }
+  chatHistory.forEach(m => {
+    const b = document.createElement('div');
+    b.className = 'chat-bubble ' + (m.role === 'user' ? 'user' : 'bot');
+    b.textContent = m.content;
+    chatMessagesEl.appendChild(b);
+  });
+  if (chatError) {
+    const e = document.createElement('div');
+    e.className = 'chat-bubble error';
+    e.textContent = chatError;
+    chatMessagesEl.appendChild(e);
+  }
+  if (showTyping) {
+    const t = document.createElement('div');
+    t.className = 'chat-typing';
+    for (let i = 0; i < 3; i++) t.appendChild(document.createElement('span'));
+    chatMessagesEl.appendChild(t);
+  }
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+function saveChat() {
+  if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
+  localStorage.setItem('bethanyChat', JSON.stringify(chatHistory));
+}
+
+async function sendChat() {
+  const text = chatInputEl.value.trim();
+  if (!text || chatPending) return;
+  chatInputEl.value = '';
+  chatError = '';
+  chatHistory.push({ role: 'user', content: text.slice(0, 800) });
+  saveChat();
+  chatPending = true;
+  chatSendEl.disabled = true;
+  renderChat(true);
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory.slice(-12) })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !data.reply) throw new Error();
+    chatHistory.push({ role: 'assistant', content: data.reply });
+    saveChat();
+  } catch {
+    chatError = "Hmm, my brain's asleep right now — try again in a minute! 😴";
+  }
+  chatPending = false;
+  chatSendEl.disabled = false;
+  renderChat();
+}
+
+function clearChat() {
+  chatHistory = [];
+  chatError = '';
+  localStorage.removeItem('bethanyChat');
+  renderChat();
+}
+
+chatInputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
+});
+renderChat();
 
 // ── FAVICON ──
 document.fonts.load('26px "Pinyon Script"').then(() => {

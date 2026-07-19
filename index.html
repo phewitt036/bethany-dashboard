@@ -600,7 +600,7 @@
 
   /* ── CHANGE PIN MODAL ── */
   #changePinModal {
-    position: fixed; inset: 0; z-index: 9998; background: rgba(30,16,40,0.5);
+    position: fixed; inset: 0; z-index: 10000; background: rgba(30,16,40,0.5);
     display: flex; align-items: center; justify-content: center;
   }
   #changePinModal.hidden { display: none; }
@@ -837,10 +837,10 @@
 
       <div class="pomo-sessions">
         <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;">Sessions</span>
-        <div class="pomo-dot" id="pd1"></div>
-        <div class="pomo-dot" id="pd2"></div>
-        <div class="pomo-dot" id="pd3"></div>
-        <div class="pomo-dot" id="pd4"></div>
+        <div class="pomo-dot" id="sd1"></div>
+        <div class="pomo-dot" id="sd2"></div>
+        <div class="pomo-dot" id="sd3"></div>
+        <div class="pomo-dot" id="sd4"></div>
       </div>
     </div>
 
@@ -1013,8 +1013,11 @@ document.getElementById('calNext').onclick = () => { calMonth++; if(calMonth>11)
 buildCalendar();
 
 // ── CHECKLIST with midnight reset ──
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 let checklist = JSON.parse(localStorage.getItem('bethanyChecklist') || '[]');
-const todayStr = new Date().toISOString().split('T')[0];
+const todayStr = localDateStr();
 const lastDate = localStorage.getItem('bethanyChecklistDate') || todayStr;
 if (lastDate < todayStr) {
   checklist = checklist.filter(item => !item.done);
@@ -1035,7 +1038,17 @@ function renderChecklist() {
     const i = checklist.indexOf(item);
     const div = document.createElement('div');
     div.className = 'check-item' + (item.done ? ' done' : '');
-    div.innerHTML = `<div class="check-box" onclick="toggleCheck(${i})"></div><span class="check-label">${item.text}</span><button class="check-delete" onclick="deleteCheck(${i})">✕</button>`;
+    const box = document.createElement('div');
+    box.className = 'check-box';
+    box.onclick = () => toggleCheck(i);
+    const label = document.createElement('span');
+    label.className = 'check-label';
+    label.textContent = item.text;
+    const del = document.createElement('button');
+    del.className = 'check-delete';
+    del.textContent = '✕';
+    del.onclick = () => deleteCheck(i);
+    div.append(box, label, del);
     container.appendChild(div);
   });
 }
@@ -1078,12 +1091,54 @@ const q = quotes[Math.floor(Date.now()/86400000) % quotes.length];
 document.getElementById('quoteText').textContent = q.text;
 document.getElementById('quoteAttr').textContent = `— ${q.attr}`;
 
-// ── NOTES ──
-document.getElementById('addNoteBtn').onclick = () => {
-  const grid = document.getElementById('notesGrid');
+// ── NOTES (persisted to localStorage) ──
+const NOTES_KEY = 'bethanyNotes';
+const notesGrid = document.getElementById('notesGrid');
+
+function collectNotes() {
+  return [...notesGrid.querySelectorAll('.note-item')].map(item => ({
+    title: item.querySelector('.note-title-input').value,
+    body:  item.querySelector('.note-body-input').value
+  }));
+}
+function saveNotes() {
+  try { localStorage.setItem(NOTES_KEY, JSON.stringify(collectNotes())); } catch(e) {}
+}
+function buildNoteEl(note) {
   const div = document.createElement('div'); div.className = 'note-item';
-  div.innerHTML = `<button class="note-delete" onclick="this.closest('.note-item').remove()">✕</button><input class="note-title-input" placeholder="Title..."><textarea class="note-body-input" placeholder="Type your note..." rows="3"></textarea>`;
-  grid.appendChild(div); div.querySelector('input').focus();
+  const del = document.createElement('button');
+  del.className = 'note-delete'; del.textContent = '✕';
+  del.onclick = () => { div.remove(); saveNotes(); };
+  const title = document.createElement('input');
+  title.className = 'note-title-input'; title.placeholder = 'Title...';
+  title.value = note.title || '';
+  const body = document.createElement('textarea');
+  body.className = 'note-body-input'; body.placeholder = 'Type your note...'; body.rows = 3;
+  body.value = note.body || '';
+  div.append(del, title, body);
+  return div;
+}
+(function initNotes() {
+  const stored = localStorage.getItem(NOTES_KEY);
+  if (stored !== null) {
+    // Rebuild from saved notes (may be an empty list — demo notes only seed on first-ever load)
+    let notes = [];
+    try { notes = JSON.parse(stored) || []; } catch(e) {}
+    notesGrid.innerHTML = '';
+    notes.forEach(n => notesGrid.appendChild(buildNoteEl(n)));
+  } else {
+    // First-ever load: adopt the demo notes and wire deletes to persist
+    notesGrid.querySelectorAll('.note-item').forEach(item => {
+      const del = item.querySelector('.note-delete');
+      if (del) del.onclick = () => { item.remove(); saveNotes(); };
+    });
+    saveNotes();
+  }
+  notesGrid.addEventListener('input', saveNotes);
+})();
+document.getElementById('addNoteBtn').onclick = () => {
+  const div = buildNoteEl({ title:'', body:'' });
+  notesGrid.appendChild(div); saveNotes(); div.querySelector('input').focus();
 };
 
 // ── MOOD ──
@@ -1092,7 +1147,7 @@ const moodDays = ['S','M','T','W','T','F','S'];
 function selectMood(btn) {
   document.querySelectorAll('.mood-emoji').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  const key = new Date().toISOString().split('T')[0];
+  const key = localDateStr();
   moodData[key] = btn.dataset.mood;
   try { localStorage.setItem('bethanyMoods', JSON.stringify(moodData)); } catch(e) {}
   renderMoodHistory();
@@ -1102,12 +1157,12 @@ function renderMoodHistory() {
   const today = new Date();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today); d.setDate(d.getDate()-i);
-    const key = d.toISOString().split('T')[0];
+    const key = localDateStr(d);
     const item = document.createElement('div'); item.className = 'mood-hist-item';
     item.innerHTML = `<div class="emoji-display">${moodData[key]||'<span style="color:#ddd;font-size:11px;">·</span>'}</div><span class="day-lbl">${moodDays[d.getDay()]}</span>`;
     container.appendChild(item);
   }
-  const todayKey = new Date().toISOString().split('T')[0];
+  const todayKey = localDateStr();
   if (moodData[todayKey]) {
     document.querySelectorAll('.mood-emoji').forEach(b => { if(b.dataset.mood===moodData[todayKey]) b.classList.add('selected'); });
   }
@@ -1205,7 +1260,7 @@ function resetPomo() {
 
 function updateSessionDots() {
   for (let i = 1; i <= 4; i++) {
-    const dot = document.getElementById(`pd${i}`);
+    const dot = document.getElementById(`sd${i}`);
     if (i <= pomoSessions % 4 || (pomoSessions % 4 === 0 && pomoSessions > 0 && i === 4)) {
       dot.classList.add('done');
     } else {
@@ -1219,7 +1274,7 @@ updatePomoDisplay();
 // ── SPOTIFY (PKCE flow) ──
 const SPOTIFY_CLIENT_ID = '9e15d30c4c664d52a39f35617db568fb';
 const SPOTIFY_SCOPES    = 'user-read-playback-state user-modify-playback-state user-read-currently-playing';
-const REDIRECT_URI      = (window.location.origin + window.location.pathname).replace(/\/$/, '');
+const REDIRECT_URI      = window.location.origin + '/';
 
 let spotifyToken     = localStorage.getItem('bethanySpotifyToken') || null;
 let spotifyExpiry    = parseInt(localStorage.getItem('bethanySpotifyExpiry') || '0');
@@ -1252,7 +1307,11 @@ async function genChallenge(verifier) {
   }
   if (!code) return;
   const verifier = localStorage.getItem('bethanySpotifyVerifier');
-  if (!verifier) return;
+  if (!verifier) {
+    history.replaceState(null, '', window.location.pathname);
+    showSpotifyState('connect');
+    return;
+  }
 
   try {
     const body = new URLSearchParams({
@@ -1270,6 +1329,7 @@ async function genChallenge(verifier) {
     if (!res.ok) {
       console.error('Token exchange failed:', await res.text());
       history.replaceState(null, '', window.location.pathname);
+      showSpotifyState('connect');
       return;
     }
     const data = await res.json();
@@ -1284,6 +1344,7 @@ async function genChallenge(verifier) {
   } catch(e) {
     console.error(e);
     history.replaceState(null, '', window.location.pathname);
+    showSpotifyState('connect');
   }
 })();
 
@@ -1335,7 +1396,7 @@ function showSpotifyState(state) {
   document.getElementById('spotifyIdle').classList.toggle('visible',    state==='idle');
 }
 
-async function fetchNowPlaying() {
+async function fetchNowPlaying(isRetry) {
   if (!spotifyToken) { showSpotifyState('connect'); return; }
   if (Date.now() > spotifyExpiry - 30000) {
     const ok = await refreshSpotifyToken();
@@ -1347,8 +1408,10 @@ async function fetchNowPlaying() {
     });
     if (res.status === 204 || res.status === 404) { showSpotifyState('idle'); return; }
     if (res.status === 401) {
-      const ok = await refreshSpotifyToken();
-      if (ok) return fetchNowPlaying();
+      if (!isRetry) {
+        const ok = await refreshSpotifyToken();
+        if (ok) return fetchNowPlaying(true);
+      }
       spotifyToken = null; showSpotifyState('connect'); return;
     }
     if (!res.ok) return;
@@ -1362,7 +1425,11 @@ async function fetchNowPlaying() {
     const artEl = document.getElementById('spotifyArt');
     const img = data.item.album?.images?.[1]?.url || data.item.album?.images?.[0]?.url;
     if (img) {
-      artEl.innerHTML = `<img src="${img}" alt="Album art">`;
+      artEl.innerHTML = '';
+      const imgEl = document.createElement('img');
+      imgEl.src = img;
+      imgEl.alt = 'Album art';
+      artEl.appendChild(imgEl);
     } else {
       artEl.innerHTML = '<span class="spotify-album-placeholder">🎵</span>';
     }
@@ -1389,8 +1456,12 @@ async function spotifyPlayPause() {
       headers: { Authorization: `Bearer ${spotifyToken}` }
     });
     if (!res.ok) return;
-    const data = await res.json();
-    const endpoint = data.is_playing
+    let isPlaying = false;
+    if (res.status !== 204) {
+      const text = await res.text();
+      if (text) { try { isPlaying = !!JSON.parse(text).is_playing; } catch(e) {} }
+    }
+    const endpoint = isPlaying
       ? 'https://api.spotify.com/v1/me/player/pause'
       : 'https://api.spotify.com/v1/me/player/play';
     await fetch(endpoint, { method:'PUT', headers:{ Authorization:`Bearer ${spotifyToken}` }});
@@ -1461,6 +1532,7 @@ function updatePinDots() {
 
 function checkPin() {
   if (pinEntry === getPin()) {
+    sessionStorage.setItem('bethanyUnlocked', '1');
     document.getElementById('pinOverlay').classList.add('hidden');
   } else {
     const dots = document.getElementById('pinDots');
@@ -1504,13 +1576,6 @@ function submitChangePin() {
   if (sessionStorage.getItem('bethanyUnlocked') === '1') {
     document.getElementById('pinOverlay').classList.add('hidden');
   }
-  // Hide overlay on successful unlock and mark session
-  const observer = new MutationObserver(() => {
-    if (document.getElementById('pinOverlay').classList.contains('hidden')) {
-      sessionStorage.setItem('bethanyUnlocked', '1');
-    }
-  });
-  observer.observe(document.getElementById('pinOverlay'), { attributes: true });
 })();
 
 // ── FAVICON ──

@@ -1044,15 +1044,9 @@ Email Mrs. Peterson re: project</textarea>
     </div>
     <div class="zone-row">
       <span class="zone-name">Ceiling</span>
-      <button class="zone-toggle" data-zone="ceiling" aria-label="Toggle ceiling lights"></button>
-      <input class="zone-slider" type="range" min="1" max="100" value="100" data-zone="ceiling" aria-label="Ceiling brightness">
-      <span class="zone-pct" data-zone="ceiling">—</span>
-    </div>
-    <div class="zone-row">
-      <span class="zone-name">Desk</span>
-      <button class="zone-toggle" data-zone="desk" aria-label="Toggle desk lights"></button>
-      <input class="zone-slider" type="range" min="1" max="100" value="100" data-zone="desk" aria-label="Desk brightness">
-      <span class="zone-pct" data-zone="desk">—</span>
+      <button class="zone-toggle" id="lightToggle" aria-label="Toggle ceiling lights"></button>
+      <input class="zone-slider" type="range" min="1" max="100" value="100" id="lightSlider" aria-label="Brightness">
+      <span class="zone-pct" id="lightPct">—</span>
     </div>
     <div class="lights-status" id="lightsStatus"></div>
   </div>
@@ -1774,25 +1768,21 @@ renderChat();
 // ── LIGHTS ──
 const lightsStatusEl = document.getElementById('lightsStatus');
 const sceneBtns = [...document.querySelectorAll('.scene-btn')];
-const zoneToggles = [...document.querySelectorAll('.zone-toggle')];
-const zoneSliders = [...document.querySelectorAll('.zone-slider')];
+const lightToggle = document.getElementById('lightToggle');
+const lightSlider = document.getElementById('lightSlider');
+const lightPct = document.getElementById('lightPct');
 let lightsBusy = false;
 
 function setLightsBusy(busy) {
   lightsBusy = busy;
-  [...sceneBtns, ...zoneToggles, ...zoneSliders].forEach(el => { el.disabled = busy; });
+  [...sceneBtns, lightToggle, lightSlider].forEach(el => { el.disabled = busy; });
 }
 
-function renderLights(zones) {
-  if (!zones) return;
-  for (const [zone, s] of Object.entries(zones)) {
-    const toggle = zoneToggles.find(t => t.dataset.zone === zone);
-    const slider = zoneSliders.find(t => t.dataset.zone === zone);
-    const pct = document.querySelector('.zone-pct[data-zone="' + zone + '"]');
-    if (toggle) toggle.classList.toggle('on', !!s.on);
-    if (slider && s.brightness != null) slider.value = s.brightness;
-    if (pct) pct.textContent = s.on ? (s.brightness != null ? s.brightness + '%' : 'on') : 'off';
-  }
+function renderLights(light) {
+  if (!light) return;
+  lightToggle.classList.toggle('on', !!light.on);
+  if (light.brightness != null) lightSlider.value = light.brightness;
+  lightPct.textContent = light.on ? (light.brightness != null ? light.brightness + '%' : 'on') : 'off';
 }
 
 async function lightsCall(payload) {
@@ -1807,7 +1797,7 @@ async function lightsCall(payload) {
     const data = await res.json().catch(() => null);
     if (!res.ok || !data) throw new Error();
     lightsStatusEl.textContent = '';
-    renderLights(data.zones);
+    renderLights(data.light);
     return data;
   } catch {
     lightsStatusEl.textContent = "Can't reach your lights right now 💤";
@@ -1822,20 +1812,15 @@ sceneBtns.forEach(btn => btn.addEventListener('click', async () => {
   if (ok) sceneBtns.forEach(b => b.classList.toggle('active', b === btn));
 }));
 
-zoneToggles.forEach(btn => btn.addEventListener('click', () => {
+lightToggle.addEventListener('click', () => {
   sceneBtns.forEach(b => b.classList.remove('active'));
-  lightsCall({ action: 'power', zone: btn.dataset.zone, on: !btn.classList.contains('on') });
-}));
+  lightsCall({ action: 'power', on: !lightToggle.classList.contains('on') });
+});
 
-zoneSliders.forEach(slider => {
-  slider.addEventListener('input', () => {
-    const pct = document.querySelector('.zone-pct[data-zone="' + slider.dataset.zone + '"]');
-    if (pct) pct.textContent = slider.value + '%';
-  });
-  slider.addEventListener('change', () => {
-    sceneBtns.forEach(b => b.classList.remove('active'));
-    lightsCall({ action: 'brightness', zone: slider.dataset.zone, value: Number(slider.value) });
-  });
+lightSlider.addEventListener('input', () => { lightPct.textContent = lightSlider.value + '%'; });
+lightSlider.addEventListener('change', () => {
+  sceneBtns.forEach(b => b.classList.remove('active'));
+  lightsCall({ action: 'brightness', value: Number(lightSlider.value) });
 });
 
 lightsCall({ action: 'state' });

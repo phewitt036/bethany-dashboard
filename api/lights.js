@@ -1,4 +1,3 @@
-const ZONES = ["ceiling", "desk", "all"];
 const SCENES = ["study", "wind_down", "movie", "ravenclaw", "avatar"];
 
 function buildPayload(body) {
@@ -6,12 +5,12 @@ function buildPayload(body) {
     case "state":
       return { action: "state" };
     case "power":
-      if (!ZONES.includes(body.zone) || typeof body.on !== "boolean") return null;
-      return { action: "power", zone: body.zone, on: body.on };
+      if (typeof body.on !== "boolean") return null;
+      return { action: "power", on: body.on };
     case "brightness": {
       const value = Number(body.value);
-      if (!ZONES.includes(body.zone) || !Number.isInteger(value) || value < 1 || value > 100) return null;
-      return { action: "brightness", zone: body.zone, value };
+      if (!Number.isInteger(value) || value < 1 || value > 100) return null;
+      return { action: "brightness", value };
     }
     case "scene":
       if (!SCENES.includes(body.scene)) return null;

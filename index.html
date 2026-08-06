@@ -225,6 +225,39 @@
   }
   .check-add-btn:hover { opacity:0.88; transform:translateY(-1px); }
 
+  /* ── LIGHTS ── */
+  .lights-card { margin-top: 22px; }
+  .scene-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .scene-btn {
+    flex:1 1 auto; min-width:106px;
+    background:var(--purple-cream); border:1.5px solid var(--purple-pale);
+    border-radius:12px; padding:10px 12px;
+    font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-mid);
+    cursor:pointer; transition:all 0.18s;
+  }
+  .scene-btn:hover:not(:disabled) { border-color:var(--purple); transform:translateY(-1px); }
+  .scene-btn.active { background:linear-gradient(135deg,var(--purple),var(--purple-deep)); color:#fff; border-color:transparent; }
+  .scene-btn:disabled { opacity:0.55; cursor:default; }
+  .zone-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--purple-pale); }
+  .zone-row:first-of-type { margin-top:10px; }
+  .zone-name { font-size:13px; color:var(--text-mid); width:60px; flex-shrink:0; }
+  .zone-slider { flex:1; accent-color:var(--purple); cursor:pointer; min-width:0; }
+  .zone-slider:disabled { opacity:0.55; cursor:default; }
+  .zone-pct { font-size:11px; color:var(--text-soft); width:36px; text-align:right; flex-shrink:0; }
+  .zone-toggle {
+    border:none; border-radius:999px; width:44px; height:24px; flex-shrink:0;
+    background:var(--purple-pale); cursor:pointer; position:relative; transition:background 0.2s;
+  }
+  .zone-toggle::after {
+    content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
+    border-radius:50%; background:#fff; transition:transform 0.2s;
+    box-shadow:0 1px 3px rgba(100,50,140,0.3);
+  }
+  .zone-toggle.on { background:var(--purple); }
+  .zone-toggle.on::after { transform:translateX(20px); }
+  .zone-toggle:disabled { opacity:0.55; cursor:default; }
+  .lights-status { font-size:11px; color:var(--text-soft); margin-top:12px; min-height:15px; }
+
   /* ── CHAT ── */
   .chat-card { margin-top: 22px; }
   .chat-messages {
@@ -999,6 +1032,31 @@ Email Mrs. Peterson re: project</textarea>
 
   </div>
 
+  <!-- ── MY LIGHTS ── -->
+  <div class="card purple-top lights-card">
+    <div class="card-title"><span class="pip purple"></span> My Lights</div>
+    <div class="scene-row" id="sceneRow">
+      <button class="scene-btn" data-scene="study">📚 Study</button>
+      <button class="scene-btn" data-scene="wind_down">🌙 Wind Down</button>
+      <button class="scene-btn" data-scene="movie">🎬 Movie</button>
+      <button class="scene-btn" data-scene="ravenclaw">🦅 Ravenclaw</button>
+      <button class="scene-btn" data-scene="avatar">💫 Avatar</button>
+    </div>
+    <div class="zone-row">
+      <span class="zone-name">Ceiling</span>
+      <button class="zone-toggle" data-zone="ceiling" aria-label="Toggle ceiling lights"></button>
+      <input class="zone-slider" type="range" min="1" max="100" value="100" data-zone="ceiling" aria-label="Ceiling brightness">
+      <span class="zone-pct" data-zone="ceiling">—</span>
+    </div>
+    <div class="zone-row">
+      <span class="zone-name">Desk</span>
+      <button class="zone-toggle" data-zone="desk" aria-label="Toggle desk lights"></button>
+      <input class="zone-slider" type="range" min="1" max="100" value="100" data-zone="desk" aria-label="Desk brightness">
+      <span class="zone-pct" data-zone="desk">—</span>
+    </div>
+    <div class="lights-status" id="lightsStatus"></div>
+  </div>
+
   <!-- ── BETHANY'S BUDDY CHAT ── -->
   <div class="card purple-top chat-card">
     <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -1712,6 +1770,75 @@ chatInputEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
 });
 renderChat();
+
+// ── LIGHTS ──
+const lightsStatusEl = document.getElementById('lightsStatus');
+const sceneBtns = [...document.querySelectorAll('.scene-btn')];
+const zoneToggles = [...document.querySelectorAll('.zone-toggle')];
+const zoneSliders = [...document.querySelectorAll('.zone-slider')];
+let lightsBusy = false;
+
+function setLightsBusy(busy) {
+  lightsBusy = busy;
+  [...sceneBtns, ...zoneToggles, ...zoneSliders].forEach(el => { el.disabled = busy; });
+}
+
+function renderLights(zones) {
+  if (!zones) return;
+  for (const [zone, s] of Object.entries(zones)) {
+    const toggle = zoneToggles.find(t => t.dataset.zone === zone);
+    const slider = zoneSliders.find(t => t.dataset.zone === zone);
+    const pct = document.querySelector('.zone-pct[data-zone="' + zone + '"]');
+    if (toggle) toggle.classList.toggle('on', !!s.on);
+    if (slider && s.brightness != null) slider.value = s.brightness;
+    if (pct) pct.textContent = s.on ? (s.brightness != null ? s.brightness + '%' : 'on') : 'off';
+  }
+}
+
+async function lightsCall(payload) {
+  if (lightsBusy) return null;
+  setLightsBusy(true);
+  try {
+    const res = await fetch('/api/lights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) throw new Error();
+    lightsStatusEl.textContent = '';
+    renderLights(data.zones);
+    return data;
+  } catch {
+    lightsStatusEl.textContent = "Can't reach your lights right now 💤";
+    return null;
+  } finally {
+    setLightsBusy(false);
+  }
+}
+
+sceneBtns.forEach(btn => btn.addEventListener('click', async () => {
+  const ok = await lightsCall({ action: 'scene', scene: btn.dataset.scene });
+  if (ok) sceneBtns.forEach(b => b.classList.toggle('active', b === btn));
+}));
+
+zoneToggles.forEach(btn => btn.addEventListener('click', () => {
+  sceneBtns.forEach(b => b.classList.remove('active'));
+  lightsCall({ action: 'power', zone: btn.dataset.zone, on: !btn.classList.contains('on') });
+}));
+
+zoneSliders.forEach(slider => {
+  slider.addEventListener('input', () => {
+    const pct = document.querySelector('.zone-pct[data-zone="' + slider.dataset.zone + '"]');
+    if (pct) pct.textContent = slider.value + '%';
+  });
+  slider.addEventListener('change', () => {
+    sceneBtns.forEach(b => b.classList.remove('active'));
+    lightsCall({ action: 'brightness', zone: slider.dataset.zone, value: Number(slider.value) });
+  });
+});
+
+lightsCall({ action: 'state' });
 
 // ── FAVICON ──
 document.fonts.load('26px "Pinyon Script"').then(() => {

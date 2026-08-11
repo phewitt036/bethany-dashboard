@@ -258,6 +258,70 @@
   .zone-toggle:disabled { opacity:0.55; cursor:default; }
   .lights-status { font-size:11px; color:var(--text-soft); margin-top:12px; min-height:15px; }
 
+  /* Warmth slider — custom track so it can show the warm→cool gradient */
+  .warmth-slider {
+    flex:1; min-width:0; height:18px; cursor:pointer;
+    -webkit-appearance:none; appearance:none; background:transparent;
+  }
+  .warmth-slider::-webkit-slider-runnable-track {
+    height:6px; border-radius:999px;
+    background:linear-gradient(90deg,#FFAE5C,#FFD9A8,#FFF3E2,#EFF4FF,#C3D9FF);
+  }
+  .warmth-slider::-moz-range-track {
+    height:6px; border-radius:999px;
+    background:linear-gradient(90deg,#FFAE5C,#FFD9A8,#FFF3E2,#EFF4FF,#C3D9FF);
+  }
+  .warmth-slider::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; margin-top:-5px;
+    width:16px; height:16px; border-radius:50%;
+    background:#fff; border:2px solid var(--purple);
+    box-shadow:0 1px 3px rgba(100,50,140,0.3);
+  }
+  .warmth-slider::-moz-range-thumb {
+    width:16px; height:16px; border-radius:50%;
+    background:#fff; border:2px solid var(--purple);
+    box-shadow:0 1px 3px rgba(100,50,140,0.3);
+  }
+  .warmth-slider:disabled { opacity:0.55; cursor:default; }
+
+  .swatch-row { display:flex; flex-wrap:wrap; gap:8px; flex:1; min-width:0; }
+  .swatch {
+    width:24px; height:24px; border-radius:50%; flex-shrink:0;
+    border:2px solid transparent; box-shadow:0 0 0 1.5px var(--purple-pale);
+    cursor:pointer; padding:0; transition:transform 0.15s, box-shadow 0.15s;
+  }
+  .swatch:hover:not(:disabled) { transform:scale(1.12); }
+  .swatch.active { box-shadow:0 0 0 2px var(--purple); }
+  .swatch:disabled { opacity:0.55; cursor:default; }
+  .swatch.custom {
+    position:relative; overflow:hidden;
+    background:conic-gradient(from 0deg,#FF6B8B,#FFB347,#6BD6A8,#4DA6FF,#9B72CF,#FF6B8B);
+  }
+  .swatch.custom input { position:absolute; inset:-4px; opacity:0; cursor:pointer; border:none; padding:0; }
+
+  /* Wake-up light */
+  .wake-block { border-top:1px solid var(--purple-pale); padding-top:14px; margin-top:2px; }
+  .wake-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .wake-title { font-size:13px; color:var(--text-mid); }
+  .wake-controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:12px; }
+  .wake-time {
+    font-family:'DM Sans',sans-serif; font-size:14px; color:var(--text-dark);
+    background:var(--purple-cream); border:1.5px solid var(--purple-pale);
+    border-radius:10px; padding:7px 10px; cursor:pointer;
+  }
+  .wake-time:disabled { opacity:0.55; cursor:default; }
+  .day-chips { display:flex; gap:5px; flex-wrap:wrap; }
+  .day-chip {
+    width:28px; height:28px; border-radius:50%; flex-shrink:0;
+    background:var(--purple-cream); border:1.5px solid var(--purple-pale);
+    font-family:'DM Sans',sans-serif; font-size:11px; color:var(--text-soft);
+    cursor:pointer; padding:0; transition:all 0.18s;
+  }
+  .day-chip:hover:not(:disabled) { border-color:var(--purple); }
+  .day-chip.active { background:var(--purple); border-color:transparent; color:#fff; }
+  .day-chip:disabled { opacity:0.55; cursor:default; }
+  .wake-note { font-size:11px; color:var(--text-soft); line-height:1.5; margin-top:10px; }
+
   /* ── CHAT ── */
   .chat-card { margin-top: 22px; }
   .chat-messages {
@@ -1036,6 +1100,7 @@ Email Mrs. Peterson re: project</textarea>
   <div class="card purple-top lights-card">
     <div class="card-title"><span class="pip purple"></span> My Lights</div>
     <div class="scene-row" id="sceneRow">
+      <button class="scene-btn" data-scene="sunrise">🌅 Sunrise</button>
       <button class="scene-btn" data-scene="study">📚 Study</button>
       <button class="scene-btn" data-scene="wind_down">🌙 Wind Down</button>
       <button class="scene-btn" data-scene="movie">🎬 Movie</button>
@@ -1047,6 +1112,45 @@ Email Mrs. Peterson re: project</textarea>
       <button class="zone-toggle" id="lightToggle" aria-label="Toggle ceiling lights"></button>
       <input class="zone-slider" type="range" min="1" max="100" value="100" id="lightSlider" aria-label="Brightness">
       <span class="zone-pct" id="lightPct">—</span>
+    </div>
+    <div class="zone-row">
+      <span class="zone-name">Warmth</span>
+      <input class="warmth-slider" type="range" min="2000" max="6500" step="100" value="4000" id="warmthSlider" aria-label="Warmth, warm to cool">
+      <span class="zone-pct" id="warmthLabel">—</span>
+    </div>
+    <div class="zone-row">
+      <span class="zone-name">Color</span>
+      <div class="swatch-row" id="swatchRow">
+        <button class="swatch" data-hex="#9b72cf" style="background:#9b72cf" aria-label="Purple"></button>
+        <button class="swatch" data-hex="#e8a0b4" style="background:#e8a0b4" aria-label="Pink"></button>
+        <button class="swatch" data-hex="#ff6b8b" style="background:#ff6b8b" aria-label="Rose"></button>
+        <button class="swatch" data-hex="#ffb347" style="background:#ffb347" aria-label="Amber"></button>
+        <button class="swatch" data-hex="#6bd6a8" style="background:#6bd6a8" aria-label="Mint"></button>
+        <button class="swatch" data-hex="#4da6ff" style="background:#4da6ff" aria-label="Sky"></button>
+        <button class="swatch" data-hex="#2b5dab" style="background:#2b5dab" aria-label="Ravenclaw blue"></button>
+        <span class="swatch custom">
+          <input type="color" id="colorPicker" value="#9b72cf" aria-label="Pick a custom color">
+        </span>
+      </div>
+    </div>
+    <div class="wake-block">
+      <div class="wake-head">
+        <span class="wake-title">🌅 Wake-Up Light</span>
+        <button class="zone-toggle" id="wakeToggle" aria-label="Turn the wake-up light on or off"></button>
+      </div>
+      <div class="wake-controls">
+        <input class="wake-time" type="time" id="wakeTime" value="06:45" aria-label="Wake-up time">
+        <div class="day-chips" id="dayChips" role="group" aria-label="Days to wake up">
+          <button class="day-chip" data-day="0" aria-label="Sunday">S</button>
+          <button class="day-chip" data-day="1" aria-label="Monday">M</button>
+          <button class="day-chip" data-day="2" aria-label="Tuesday">T</button>
+          <button class="day-chip" data-day="3" aria-label="Wednesday">W</button>
+          <button class="day-chip" data-day="4" aria-label="Thursday">T</button>
+          <button class="day-chip" data-day="5" aria-label="Friday">F</button>
+          <button class="day-chip" data-day="6" aria-label="Saturday">S</button>
+        </div>
+      </div>
+      <p class="wake-note">Your lights fade up warm and soft — 1% to 25% over 10 minutes — so you're already waking before your alarm goes off. Tap 🌅 Sunrise any time to try it.</p>
     </div>
     <div class="lights-status" id="lightsStatus"></div>
   </div>
@@ -1771,11 +1875,31 @@ const sceneBtns = [...document.querySelectorAll('.scene-btn')];
 const lightToggle = document.getElementById('lightToggle');
 const lightSlider = document.getElementById('lightSlider');
 const lightPct = document.getElementById('lightPct');
+const warmthSlider = document.getElementById('warmthSlider');
+const warmthLabel = document.getElementById('warmthLabel');
+const swatchBtns = [...document.querySelectorAll('.swatch[data-hex]')];
+const colorPicker = document.getElementById('colorPicker');
+const wakeToggle = document.getElementById('wakeToggle');
+const wakeTimeInput = document.getElementById('wakeTime');
+const dayChips = [...document.querySelectorAll('.day-chip')];
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 let lightsBusy = false;
+let wakeDays = new Set([1, 2, 3, 4, 5]);
+let wakeSaveTimer = null;
 
 function setLightsBusy(busy) {
   lightsBusy = busy;
-  [...sceneBtns, lightToggle, lightSlider].forEach(el => { el.disabled = busy; });
+  [...sceneBtns, lightToggle, lightSlider, warmthSlider, ...swatchBtns,
+   colorPicker, wakeToggle, wakeTimeInput, ...dayChips].forEach(el => { el.disabled = busy; });
+}
+
+function clearScenes() { sceneBtns.forEach(b => b.classList.remove('active')); }
+
+function warmthWord(k) {
+  if (k <= 2700) return 'Warm';
+  if (k <= 3800) return 'Soft';
+  if (k <= 5000) return 'Mid';
+  return 'Cool';
 }
 
 function renderLights(light) {
@@ -1783,6 +1907,28 @@ function renderLights(light) {
   lightToggle.classList.toggle('on', !!light.on);
   if (light.brightness != null) lightSlider.value = light.brightness;
   lightPct.textContent = light.on ? (light.brightness != null ? light.brightness + '%' : 'on') : 'off';
+
+  // The strips are either in color mode or white/warmth mode, never both.
+  const hex = typeof light.color === 'string' ? light.color.toLowerCase() : null;
+  swatchBtns.forEach(b => b.classList.toggle('active', b.dataset.hex === hex));
+  if (hex) {
+    colorPicker.value = hex;
+    warmthLabel.textContent = '—';
+  } else if (light.kelvin != null) {
+    warmthSlider.value = Math.min(Math.max(light.kelvin, Number(warmthSlider.min)), Number(warmthSlider.max));
+    warmthLabel.textContent = warmthWord(light.kelvin);
+  }
+}
+
+function renderWake(wake) {
+  if (!wake) return;
+  wakeToggle.classList.toggle('on', !!wake.enabled);
+  if (typeof wake.time === 'string' && TIME_RE.test(wake.time)) wakeTimeInput.value = wake.time;
+  if (Array.isArray(wake.days)) {
+    const days = wake.days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6);
+    if (days.length) wakeDays = new Set(days);
+  }
+  dayChips.forEach(c => c.classList.toggle('active', wakeDays.has(Number(c.dataset.day))));
 }
 
 async function lightsCall(payload) {
@@ -1798,6 +1944,8 @@ async function lightsCall(payload) {
     if (!res.ok || !data) throw new Error();
     lightsStatusEl.textContent = '';
     renderLights(data.light);
+    // Don't stomp edits she's made since this request went out.
+    if (!wakeSaveTimer) renderWake(data.wake);
     return data;
   } catch {
     lightsStatusEl.textContent = "Can't reach your lights right now 💤";
@@ -1813,16 +1961,85 @@ sceneBtns.forEach(btn => btn.addEventListener('click', async () => {
 }));
 
 lightToggle.addEventListener('click', () => {
-  sceneBtns.forEach(b => b.classList.remove('active'));
+  clearScenes();
   lightsCall({ action: 'power', on: !lightToggle.classList.contains('on') });
 });
 
 lightSlider.addEventListener('input', () => { lightPct.textContent = lightSlider.value + '%'; });
 lightSlider.addEventListener('change', () => {
-  sceneBtns.forEach(b => b.classList.remove('active'));
+  clearScenes();
   lightsCall({ action: 'brightness', value: Number(lightSlider.value) });
 });
 
+warmthSlider.addEventListener('input', () => { warmthLabel.textContent = warmthWord(Number(warmthSlider.value)); });
+warmthSlider.addEventListener('change', () => {
+  clearScenes();
+  swatchBtns.forEach(b => b.classList.remove('active'));
+  lightsCall({ action: 'warmth', kelvin: Number(warmthSlider.value) });
+});
+
+swatchBtns.forEach(btn => btn.addEventListener('click', async () => {
+  clearScenes();
+  const ok = await lightsCall({ action: 'color', hex: btn.dataset.hex });
+  if (ok) {
+    colorPicker.value = btn.dataset.hex;
+    swatchBtns.forEach(b => b.classList.toggle('active', b === btn));
+    warmthLabel.textContent = '—';
+  }
+}));
+
+colorPicker.addEventListener('change', async () => {
+  clearScenes();
+  const ok = await lightsCall({ action: 'color', hex: colorPicker.value });
+  if (ok) {
+    swatchBtns.forEach(b => b.classList.toggle('active', b.dataset.hex === colorPicker.value.toLowerCase()));
+    warmthLabel.textContent = '—';
+  }
+});
+
+// ── WAKE-UP LIGHT ──
+// The schedule lives on the agent-hub so the sunrise still runs with this tab closed;
+// the dashboard only reads it back and writes changes.
+
+function prettyTime(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+function queueWakeSave() {
+  clearTimeout(wakeSaveTimer);
+  wakeSaveTimer = setTimeout(async () => {
+    if (lightsBusy) { queueWakeSave(); return; }  // another light call is in flight — try again shortly
+    wakeSaveTimer = null;
+    const enabled = wakeToggle.classList.contains('on');
+    const time = wakeTimeInput.value;
+    const days = [...wakeDays].sort((a, b) => a - b);
+    if (!TIME_RE.test(time)) { lightsStatusEl.textContent = 'Pick a wake-up time first ✨'; return; }
+    if (!days.length) { lightsStatusEl.textContent = 'Pick at least one day for your wake-up light ✨'; return; }
+    const ok = await lightsCall({ action: 'wake_set', enabled, time, days });
+    if (ok) {
+      lightsStatusEl.textContent = enabled
+        ? `Wake-up light set for ${prettyTime(time)} ✨`
+        : 'Wake-up light is off';
+    }
+  }, 600);
+}
+
+wakeToggle.addEventListener('click', () => {
+  wakeToggle.classList.toggle('on');
+  queueWakeSave();
+});
+
+wakeTimeInput.addEventListener('change', queueWakeSave);
+
+dayChips.forEach(chip => chip.addEventListener('click', () => {
+  const day = Number(chip.dataset.day);
+  if (wakeDays.has(day)) wakeDays.delete(day); else wakeDays.add(day);
+  chip.classList.toggle('active', wakeDays.has(day));
+  queueWakeSave();
+}));
+
+dayChips.forEach(c => c.classList.toggle('active', wakeDays.has(Number(c.dataset.day))));
 lightsCall({ action: 'state' });
 
 // ── FAVICON ──
